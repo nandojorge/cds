@@ -182,6 +182,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                           <span className="text-[10px] font-bold bg-white text-[#18181B] px-1.5 py-0.5 rounded border border-[#E4E4E7]">
                             {cd.mediaFormat === 'Vinyl' ? 'Vinil' : 'CD'}
                           </span>
+                          {cd.marketPrice && (
+                            <span className="hidden sm:inline text-[10px] text-[#71717A]">
+                              {cd.marketPrice}
+                            </span>
+                          )}
                           {cd.year > 0 && <span>{cd.year}</span>}
                           {cd.shelfLocation && (
                             <span className="hidden sm:inline bg-white border border-[#E4E4E7] px-2 py-0.5 rounded text-[#18181B] text-[10px] font-bold">

@@ -1,13 +1,15 @@
 export type CDStatus = 'collection' | 'wishlist' | 'loaned';
 export type MediaFormat = 'CD' | 'Vinyl';
+export type ReleaseType = 'Album' | 'Single' | 'EP';
 
 export interface CDItem {
   id: string;
-  title: string;          // Álbum
+  title: string;          // Álbum / Single
   artist: string;         // Banda/Artista
   year: number;           // Ano de lançamento
   genre?: string;         // (Legado, não utilizado na interface)
   mediaFormat?: MediaFormat; // Formato: 'CD' | 'Vinyl'
+  releaseType?: ReleaseType; // Tipo: 'Album' | 'Single' | 'EP'
   coverUrl?: string;      // Capa
   mbid?: string;          // MusicBrainz Release ID
   barcode?: string;
@@ -17,6 +19,9 @@ export interface CDItem {
   tracks?: string[];
   status: CDStatus;
   
+  // Market & Pricing fields
+  marketPrice?: string;   // Preço de mercado estimado / referência (ex: "~14,50 €")
+
   // Wishlist specific fields
   desiredPrice?: string;  // Preço pretendido (ex: "15 €")
   purchaseNotes?: string; // Notas de compra (ex: "procurar edição deluxe / remaster 2011")
@@ -57,6 +62,11 @@ export interface MusicBrainzRelease {
   barcode?: string;
   'label-info-list'?: Array<{ label?: { name: string } }>;
   'track-count'?: number;
+  'release-group'?: {
+    id?: string;
+    'primary-type'?: string;
+    'secondary-types'?: string[];
+  };
   media?: Array<{ 'track-count'?: number; format?: string; tracks?: Array<{ title: string; length?: number }> }>;
   genres?: Array<{ name: string }>;
   tags?: Array<{ name: string }>;

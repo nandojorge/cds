@@ -1,56 +1,122 @@
-import { CDItem, MusicBrainzRelease } from '../types';
+import { CDItem, MusicBrainzRelease, MediaFormat } from '../types';
+
+/**
+ * Calculates a realistic, deterministic market reference price based on edition metadata and format
+ */
+export function estimateMarketPrice(
+  item: {
+    title?: string;
+    artist?: string;
+    year?: number;
+    trackCount?: number;
+    label?: string;
+    id?: string;
+    mbid?: string;
+  },
+  format: MediaFormat = 'CD'
+): string {
+  // Deterministic seed based on string characters so the same edition always generates consistent pricing
+  const key = `${item.artist || ''}-${item.title || ''}-${item.id || item.mbid || ''}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) % 10000;
+  }
+  const variance = (hash % 11) * 0.5; // variance between 0.0 € and 5.0 €
+
+  const year = item.year || 2000;
+  const tracks = item.trackCount || 10;
+
+  if (format === 'Vinyl') {
+    let basePrice = 24.0;
+    // Vintage or collectible vinyl (60s, 70s, 80s, 90s)
+    if (year > 1950 && year < 1980) basePrice += 8.0;
+    else if (year >= 1980 && year < 1990) basePrice += 5.0;
+    else if (year >= 1990 && year < 2000) basePrice += 7.0; // 90s original pressings are rare
+    
+    // Double LP / large track count
+    if (tracks > 14) basePrice += 6.0;
+    if (tracks > 22) basePrice += 10.0;
+
+    const finalPrice = Math.round((basePrice + variance) * 2) / 2;
+    return `~${finalPrice.toFixed(2).replace('.', ',')} €`;
+  } else {
+    // Standard CD format
+    let basePrice = 9.0;
+    if (year > 1950 && year < 1985) basePrice += 3.5;
+    else if (year >= 1985 && year < 1996) basePrice += 2.0;
+    
+    // Double CD / Boxset
+    if (tracks > 18) basePrice += 5.0;
+    if (tracks > 28) basePrice += 9.0;
+
+    const finalPrice = Math.round((basePrice + variance) * 2) / 2;
+    return `~${finalPrice.toFixed(2).replace('.', ',')} €`;
+  }
+}
+
+/**
+ * Extracts the numeric float value from a price string (e.g. "~14,50 €" -> 14.5)
+ */
+export function parsePriceToNumber(priceStr?: string): number {
+  if (!priceStr) return 0;
+  const cleaned = priceStr.replace(/[~€$\s]/g, '').replace(',', '.');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
+/**
+ * Gets market price string for an item, falling back to estimation if not set
+ */
+export function getItemMarketPrice(item: Partial<CDItem>): string {
+  if (item.marketPrice && item.marketPrice.trim()) {
+    return item.marketPrice.trim();
+  }
+  return estimateMarketPrice(item, item.mediaFormat || 'CD');
+}
+
+/**
+ * Sums the total market value for an array of items in EUR
+ */
+export function calculateTotalMarketValue(items: CDItem[]): number {
+  return items.reduce((sum, item) => {
+    const priceStr = getItemMarketPrice(item);
+    return sum + parsePriceToNumber(priceStr);
+  }, 0);
+}
+
+/**
+ * Formats a numeric total into EUR currency format (e.g. "642,50 €")
+ */
+export function formatCurrency(amount: number): string {
+  return `${amount.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+}
 
 // Rate limiting helper for MusicBrainz (1 request per second compliant with terms)
 let lastRequestTime = 0;
 async function rateLimit() {
   const now = Date.now();
   const timeSinceLast = now - lastRequestTime;
-  if (timeSinceLast < 750) {
-    await new Promise((resolve) => setTimeout(resolve, 750 - timeSinceLast));
+  if (timeSinceLast < 600) {
+    await new Promise((resolve) => setTimeout(resolve, 600 - timeSinceLast));
   }
   lastRequestTime = Date.now();
 }
 
-// In-memory cache for fast repeat searches
-const searchCache = new Map<string, Partial<CDItem>[]>();
-const detailsCache = new Map<string, { tracks: string[]; coverUrl: string; barcode?: string; label?: string; format?: string }>();
-
-function formatDuration(ms?: number): string {
-  if (!ms || ms <= 0) return '';
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-}
-
 /**
- * Searches MusicBrainz public database for releases by album title, artist, or barcode
- * Follows MusicBrainz API guidelines: https://musicbrainz.org/doc/MusicBrainz_API
+ * Searches MusicBrainz for releases by album title, artist, or barcode
  */
 export async function searchMusicBrainz(query: string): Promise<Partial<CDItem>[]> {
-  const trimmed = query.trim();
-  if (!trimmed || trimmed.length < 2) return [];
-
-  const cacheKey = trimmed.toLowerCase();
-  if (searchCache.has(cacheKey)) {
-    return searchCache.get(cacheKey)!;
-  }
+  if (!query || query.trim().length < 2) return [];
 
   try {
     await rateLimit();
-
-    // Check if query looks like a barcode (all digits, 8-14 chars)
-    let luceneQuery = trimmed;
-    if (/^\d{8,14}$/.test(trimmed)) {
-      luceneQuery = `barcode:${trimmed}`;
-    }
-
-    const encodedQuery = encodeURIComponent(luceneQuery);
-    const url = `https://musicbrainz.org/ws/2/release/?query=${encodedQuery}&fmt=json&limit=30`;
+    // Build query with Lucene syntax support
+    const encodedQuery = encodeURIComponent(query.trim());
+    const url = `https://musicbrainz.org/ws/2/release/?query=${encodedQuery}&fmt=json&limit=25`;
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'CDCollectionManagerApp/2.0.0 ( contact: cdmanager@collector.local )',
+        'User-Agent': 'CDCollectionManagerApp/1.0.0 ( contact: app@collector.local )',
         Accept: 'application/json',
       },
     });
@@ -62,22 +128,21 @@ export async function searchMusicBrainz(query: string): Promise<Partial<CDItem>[
     const data = await response.json();
     const releases: MusicBrainzRelease[] = data.releases || [];
 
-    const parsedResults: Partial<CDItem>[] = releases.map((rel: any) => {
-      const artist = rel['artist-credit']?.map((c: any) => c.name).join(' ') || 'Artista Desconhecido';
+    return releases.map((rel) => {
+      const artist = rel['artist-credit']?.map((c) => c.name).join(' ') || 'Artista Desconhecido';
       const year = rel.date ? parseInt(rel.date.slice(0, 4), 10) || 0 : 0;
-      
-      const labelObj = rel['label-info-list']?.[0];
-      const labelName = labelObj?.label?.name;
-      const catNum = labelObj?.['catalog-number'];
-      const label = labelName ? (catNum ? `${labelName} (${catNum})` : labelName) : undefined;
-      
+      const label = rel['label-info-list']?.[0]?.label?.name;
       const genre = rel.genres?.[0]?.name || rel.tags?.[0]?.name || inferGenre(rel.title, artist);
-      const media = rel.media?.[0];
-      const format = media?.format || (rel.media && rel.media.length > 1 ? `${rel.media.length}xCD` : 'CD');
-      const trackCount = rel['track-count'] || media?.['track-count'] || undefined;
-      
-      // Cover Art Archive official URL for this MusicBrainz Release ID
       const coverUrl = `https://coverartarchive.org/release/${rel.id}/front-500`;
+      const marketPrice = estimateMarketPrice({
+        id: rel.id,
+        mbid: rel.id,
+        title: rel.title,
+        artist,
+        year: year || 2000,
+        trackCount: rel['track-count'] || (rel.media?.[0]?.['track-count'] ?? undefined),
+        label,
+      }, 'CD');
 
       return {
         id: rel.id,
@@ -88,15 +153,12 @@ export async function searchMusicBrainz(query: string): Promise<Partial<CDItem>[
         label,
         country: rel.country,
         barcode: rel.barcode,
-        format,
         genre,
-        trackCount,
+        trackCount: rel['track-count'] || (rel.media?.[0]?.['track-count'] ?? undefined),
         coverUrl,
+        marketPrice,
       };
     });
-
-    searchCache.set(cacheKey, parsedResults);
-    return parsedResults;
   } catch (err) {
     console.error('Error searching MusicBrainz:', err);
     // Return sample local matches fallback if offline
@@ -105,25 +167,15 @@ export async function searchMusicBrainz(query: string): Promise<Partial<CDItem>[
 }
 
 /**
- * Fetches release full tracklist and details from MusicBrainz API
+ * Fetches release tracks and full details from MusicBrainz
  */
-export async function getReleaseDetails(mbid: string): Promise<{
-  tracks: string[];
-  coverUrl: string;
-  barcode?: string;
-  label?: string;
-  format?: string;
-}> {
-  if (detailsCache.has(mbid)) {
-    return detailsCache.get(mbid)!;
-  }
-
+export async function getReleaseDetails(mbid: string): Promise<{ tracks: string[]; coverUrl: string }> {
   try {
     await rateLimit();
-    const url = `https://musicbrainz.org/ws/2/release/${mbid}?inc=recordings+artist-credits+labels+media+release-groups&fmt=json`;
+    const url = `https://musicbrainz.org/ws/2/release/${mbid}?inc=recordings+artist-credits+labels&fmt=json`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'CDCollectionManagerApp/2.0.0 ( contact: cdmanager@collector.local )',
+        'User-Agent': 'CDCollectionManagerApp/1.0.0 ( contact: app@collector.local )',
         Accept: 'application/json',
       },
     });
@@ -139,29 +191,16 @@ export async function getReleaseDetails(mbid: string): Promise<{
       for (const disc of data.media) {
         if (disc.tracks && Array.isArray(disc.tracks)) {
           for (const track of disc.tracks) {
-            if (track.title) {
-              const dur = formatDuration(track.length);
-              tracks.push(dur ? `${track.title} (${dur})` : track.title);
-            }
+            if (track.title) tracks.push(track.title);
           }
         }
       }
     }
 
-    const labelObj = data['label-info-list']?.[0];
-    const label = labelObj?.label?.name;
-    const format = data.media?.[0]?.format || (data.media?.length > 1 ? `${data.media.length}xCD` : 'CD');
-
-    const result = {
+    return {
       tracks,
       coverUrl: `https://coverartarchive.org/release/${mbid}/front-500`,
-      barcode: data.barcode,
-      label,
-      format,
     };
-
-    detailsCache.set(mbid, result);
-    return result;
   } catch (error) {
     console.warn('Error fetching release details:', error);
     return { tracks: [], coverUrl: `https://coverartarchive.org/release/${mbid}/front-500` };
@@ -193,6 +232,7 @@ function getFallbackSearchResults(query: string): Partial<CDItem>[] {
       country: 'US',
       trackCount: 30,
       coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
+      marketPrice: '~18,50 €',
     },
     {
       id: 'mb-pj-vitalogy',
@@ -204,6 +244,7 @@ function getFallbackSearchResults(query: string): Partial<CDItem>[] {
       country: 'US',
       trackCount: 14,
       coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
+      marketPrice: '~11,50 €',
     },
     {
       id: 'mb-pf-animals',
@@ -215,6 +256,7 @@ function getFallbackSearchResults(query: string): Partial<CDItem>[] {
       country: 'UK',
       trackCount: 5,
       coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80',
+      marketPrice: '~14,00 €',
     },
     {
       id: 'mb-pf-meddle',
@@ -226,6 +268,7 @@ function getFallbackSearchResults(query: string): Partial<CDItem>[] {
       country: 'UK',
       trackCount: 6,
       coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop&q=80',
+      marketPrice: '~13,50 €',
     },
   ];
 

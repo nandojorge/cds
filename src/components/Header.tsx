@@ -1,7 +1,8 @@
 import React from 'react';
-import { Heart, Plus, Search, Library, LogIn, LogOut, Disc } from 'lucide-react';
+import { Heart, Plus, Search, Library, LogIn, LogOut, Disc, Coins } from 'lucide-react';
 import { ActiveTab } from '../types';
 import { User } from 'firebase/auth';
+import { formatCurrency } from '../services/musicBrainz';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -9,6 +10,7 @@ interface HeaderProps {
   collectionCount: number;
   uniqueArtistsCount: number;
   wishlistCount: number;
+  totalMarketValue: number;
   onOpenGlobalSearch: () => void;
   onOpenAddModal: () => void;
   user: User | null;
@@ -23,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   collectionCount,
   uniqueArtistsCount,
   wishlistCount,
+  totalMarketValue,
   onOpenGlobalSearch,
   onOpenAddModal,
   user,
@@ -68,6 +71,18 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center gap-1.5 bg-[#F4F4F5] border border-[#E4E4E7] px-2.5 py-1.5 rounded-lg hidden sm:flex">
                 <span className="text-[11px] text-[#71717A] font-medium">Bandas:</span>
                 <span className="text-xs font-bold text-[#18181B]">{uniqueArtistsCount}</span>
+              </div>
+
+              {/* Total Market Value Discreet Badge */}
+              <div 
+                className="flex items-center gap-1.5 bg-emerald-50/70 border border-emerald-200/80 px-2.5 py-1.5 rounded-lg"
+                title="Valor de mercado total estimado da coleção"
+              >
+                <Coins className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[11px] text-emerald-800 font-medium hidden md:inline">Valor Total:</span>
+                <span className="text-xs font-mono font-bold text-emerald-950">
+                  {formatCurrency(totalMarketValue)}
+                </span>
               </div>
 
               <button 

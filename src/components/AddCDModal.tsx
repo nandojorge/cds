@@ -13,7 +13,7 @@ import {
   Radio
 } from 'lucide-react';
 import { CDItem, MediaFormat } from '../types';
-import { searchMusicBrainz, getReleaseDetails } from '../services/musicBrainz';
+import { searchMusicBrainz, getReleaseDetails, estimateMarketPrice } from '../services/musicBrainz';
 import { CDCover } from './CDCover';
 
 interface AddCDModalProps {
@@ -63,6 +63,7 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
   const [manualArtist, setManualArtist] = useState('');
   const [manualYear, setManualYear] = useState<number>(new Date().getFullYear());
   const [manualFormat, setManualFormat] = useState<MediaFormat>('CD');
+  const [manualMarketPrice, setManualMarketPrice] = useState('');
   const [manualPrice, setManualPrice] = useState('');
   const [manualNotes, setManualNotes] = useState('');
   const [manualTarget, setManualTarget] = useState<'collection' | 'wishlist'>('collection');
@@ -143,7 +144,8 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
 
   // Add to Collection with duplicate checks
   const handleTriggerAddToCollection = async (cd: Partial<CDItem>, chosenFormat: MediaFormat = 'CD') => {
-    const cdWithFormat = { ...cd, mediaFormat: chosenFormat };
+    const marketPriceVal = cd.marketPrice || estimateMarketPrice(cd, chosenFormat);
+    const cdWithFormat = { ...cd, mediaFormat: chosenFormat, marketPrice: marketPriceVal };
 
     // 1. Check if ALREADY in collection -> STRICTLY PREVENT ADDITION
     const existingInCollection = findInCollection(cd);
@@ -187,7 +189,8 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
 
   // Add to Wishlist with duplicate checks
   const handleTriggerAddToWishlist = (cd: Partial<CDItem>, chosenFormat: MediaFormat = 'CD') => {
-    const cdWithFormat = { ...cd, mediaFormat: chosenFormat };
+    const marketPriceVal = cd.marketPrice || estimateMarketPrice(cd, chosenFormat);
+    const cdWithFormat = { ...cd, mediaFormat: chosenFormat, marketPrice: marketPriceVal };
 
     // 1. Check if ALREADY in wishlist -> STRICTLY PREVENT ADDITION
     const existingInWishlist = findInWishlist(cd);
@@ -251,11 +254,16 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
       return;
     }
 
+    const calculatedMarketPrice = manualMarketPrice.trim()
+      ? (manualMarketPrice.includes('€') ? manualMarketPrice.trim() : `~${manualMarketPrice.trim()} €`)
+      : estimateMarketPrice({ title: manualTitle, artist: manualArtist, year: Number(manualYear) }, manualFormat);
+
     const newCD: Partial<CDItem> = {
       title: manualTitle.trim(),
       artist: manualArtist.trim(),
       year: Number(manualYear) || new Date().getFullYear(),
       mediaFormat: manualFormat,
+      marketPrice: calculatedMarketPrice,
       desiredPrice: manualPrice ? (manualPrice.includes('€') ? manualPrice.trim() : `${manualPrice.trim()} €`) : undefined,
       purchaseNotes: manualNotes.trim() || undefined,
     };
@@ -475,17 +483,32 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[#18181B] mb-1">
-                    Preço (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
-                    placeholder="Ex: 15 €"
-                    className="w-full px-3 py-2 bg-white border border-[#E4E4E7] rounded-lg text-xs text-[#18181B] focus:outline-none focus:border-[#18181B]"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18181B] mb-1">
+                      Preço Mercado (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={manualMarketPrice}
+                      onChange={(e) => setManualMarketPrice(e.target.value)}
+                      placeholder="Ex: ~14,50 €"
+                      className="w-full px-3 py-2 bg-white border border-[#E4E4E7] rounded-lg text-xs text-[#18181B] focus:outline-none focus:border-[#18181B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18181B] mb-1">
+                      Preço Pretendido / Pago
+                    </label>
+                    <input
+                      type="text"
+                      value={manualPrice}
+                      onChange={(e) => setManualPrice(e.target.value)}
+                      placeholder="Ex: 15 €"
+                      className="w-full px-3 py-2 bg-white border border-[#E4E4E7] rounded-lg text-xs text-[#18181B] focus:outline-none focus:border-[#18181B]"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -599,6 +622,14 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
                           {item.country && <span>{item.country}</span>}
                           {item.label && <span className="truncate max-w-[120px]">{item.label}</span>}
                           {item.trackCount && <span>{item.trackCount} faixas</span>}
+                          
+                          {/* Preço de mercado discreto nos detalhes */}
+                          <span className="inline-flex items-center gap-1 text-[11px] text-[#71717A] font-mono">
+                            <span className="text-[#A1A1AA]">Preço de mercado:</span>
+                            <span className="font-semibold text-[#18181B] bg-white border border-[#E4E4E7] px-1.5 py-0.5 rounded text-[10px]">
+                              {estimateMarketPrice(item, chosenFormat)}
+                            </span>
+                          </span>
                         </div>
 
                         {/* Format selector pill on item */}
@@ -720,9 +751,16 @@ export const AddCDModal: React.FC<AddCDModalProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-[#18181B] font-bold mb-1">
-                  Preço pretendido (opcional)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[#18181B] font-bold">
+                    Preço pretendido (opcional)
+                  </label>
+                  {selectedForWishlist.marketPrice && (
+                    <span className="text-[10px] text-[#71717A] font-mono">
+                      Ref. Mercado: <strong className="text-[#18181B] font-semibold">{selectedForWishlist.marketPrice}</strong>
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={desiredPriceInput}

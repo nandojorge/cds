@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CDItem, MediaFormat } from '../types';
 import { CDCover } from './CDCover';
+import { estimateMarketPrice } from '../services/musicBrainz';
 
 interface CDDetailModalProps {
   cd: CDItem | null;
@@ -43,6 +44,7 @@ export const CDDetailModal: React.FC<CDDetailModalProps> = ({
   const [editArtist, setEditArtist] = useState(cd.artist);
   const [editYear, setEditYear] = useState(cd.year);
   const [editFormat, setEditFormat] = useState<MediaFormat>(cd.mediaFormat || 'CD');
+  const [editMarketPrice, setEditMarketPrice] = useState(cd.marketPrice || '');
   const [editDesiredPrice, setEditDesiredPrice] = useState(cd.desiredPrice || '');
   const [editPurchaseNotes, setEditPurchaseNotes] = useState(cd.purchaseNotes || '');
   const [editShelfLocation, setEditShelfLocation] = useState(cd.shelfLocation || '');
@@ -61,6 +63,7 @@ export const CDDetailModal: React.FC<CDDetailModalProps> = ({
       setEditArtist(cd.artist);
       setEditYear(cd.year);
       setEditFormat(cd.mediaFormat || 'CD');
+      setEditMarketPrice(cd.marketPrice || '');
       setEditDesiredPrice(cd.desiredPrice || '');
       setEditPurchaseNotes(cd.purchaseNotes || '');
       setEditShelfLocation(cd.shelfLocation || '');
@@ -103,6 +106,7 @@ export const CDDetailModal: React.FC<CDDetailModalProps> = ({
       year: Number(editYear) || cd.year,
       mediaFormat: editFormat,
       coverUrl: editCoverUrl,
+      marketPrice: editMarketPrice.trim() || undefined,
       desiredPrice: editDesiredPrice.trim() || undefined,
       purchaseNotes: editPurchaseNotes.trim() || undefined,
       shelfLocation: editShelfLocation.trim() || undefined,
@@ -273,6 +277,17 @@ export const CDDetailModal: React.FC<CDDetailModalProps> = ({
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#71717A] uppercase">Preço de Mercado (Ref.)</label>
+                    <input
+                      type="text"
+                      value={editMarketPrice}
+                      onChange={(e) => setEditMarketPrice(e.target.value)}
+                      placeholder="ex: ~14,50 €"
+                      className="w-full px-3 py-1.5 bg-[#F4F4F5] border border-[#E4E4E7] rounded-lg text-xs text-[#18181B] focus:outline-none focus:border-[#18181B]"
+                    />
+                  </div>
+
                   {!isWishlist && (
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       <div>
@@ -357,6 +372,12 @@ export const CDDetailModal: React.FC<CDDetailModalProps> = ({
                         <span className="font-bold text-[#E11D48]">Preço / Orçamento Alvo:</span>
                         <span className="font-mono font-bold text-[#18181B]">{cd.desiredPrice || 'Ainda não definido'}</span>
                       </div>
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-[#FECDD3]">
+                        <span className="text-[#71717A]">Preço de Mercado (Ref.):</span>
+                        <span className="font-mono font-semibold text-[#18181B] bg-white px-2 py-0.5 rounded border border-[#FECDD3]">
+                          {cd.marketPrice || estimateMarketPrice(cd, cd.mediaFormat || 'CD')}
+                        </span>
+                      </div>
                       {cd.purchaseNotes && (
                         <div className="text-xs text-[#52525B] pt-1 border-t border-[#FECDD3]">
                           <span className="font-bold text-[#18181B] block mb-0.5">Notas de compra:</span>
@@ -382,6 +403,12 @@ export const CDDetailModal: React.FC<CDDetailModalProps> = ({
                           Estado de Conservação:
                         </span>
                         <span className="text-[#059669] font-bold">{cd.condition || 'Mint'}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-[#E4E4E7]">
+                        <span className="text-[#71717A]">Preço de Mercado (Ref.):</span>
+                        <span className="font-mono font-semibold text-[#18181B] bg-white px-2 py-0.5 rounded border border-[#E4E4E7]">
+                          {cd.marketPrice || estimateMarketPrice(cd, cd.mediaFormat || 'CD')}
+                        </span>
                       </div>
                     </div>
                   )}

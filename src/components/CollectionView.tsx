@@ -9,10 +9,13 @@ import {
   ChevronRight, 
   ArrowLeft,
   Radio,
-  Sparkles
+  Sparkles,
+  Coins,
+  Tag
 } from 'lucide-react';
 import { CDItem, ViewMode, DisplayLayout, MediaFormat } from '../types';
 import { CDCover } from './CDCover';
+import { getItemMarketPrice, calculateTotalMarketValue, formatCurrency } from '../services/musicBrainz';
 
 interface CollectionViewProps {
   collection: CDItem[];
@@ -99,6 +102,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
       const years = cds.map((c) => c.year).filter((y) => y > 0);
       const minYear = years.length > 0 ? Math.min(...years) : undefined;
       const maxYear = years.length > 0 ? Math.max(...years) : undefined;
+      const totalMarketValue = calculateTotalMarketValue(cds);
 
       return {
         artist,
@@ -106,11 +110,17 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         count: cds.length,
         minYear,
         maxYear,
+        totalMarketValue,
       };
     });
 
     return entries.sort((a, b) => a.artist.localeCompare(b.artist));
   }, [collection, searchTerm]);
+
+  // Overall and filtered total collection market values
+  const totalCollectionValue = useMemo(() => calculateTotalMarketValue(collection), [collection]);
+  const filteredValue = useMemo(() => calculateTotalMarketValue(filteredItems), [filteredItems]);
+  const isFiltered = searchTerm.trim().length > 0 || selectedFormat !== 'all' || selectedBand !== null;
 
   return (
     <div className="space-y-6">
@@ -130,8 +140,44 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               {selectedBand} ({filteredItems.length} {filteredItems.length === 1 ? 'álbum' : 'álbuns'})
             </span>
           </div>
+          <div className="flex items-center gap-1.5 text-xs font-mono">
+            <span className="text-[#71717A] text-[11px]">Valor desta banda:</span>
+            <span className="font-bold text-emerald-950 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+              {formatCurrency(filteredValue)}
+            </span>
+          </div>
         </div>
       )}
+
+      {/* Collection Stats Summary Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-[#E4E4E7] shadow-xs">
+        <div className="flex items-center gap-3 flex-wrap text-xs text-[#71717A]">
+          <div className="flex items-center gap-1.5">
+            <Disc className="w-4 h-4 text-[#18181B]" />
+            <span className="font-bold text-[#18181B]">{collection.length}</span>
+            <span>registos no arquivo</span>
+          </div>
+          <span className="hidden sm:inline">•</span>
+          <div className="flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-[#71717A]" />
+            <span className="font-bold text-[#18181B]">{groupedBands.length}</span>
+            <span>bandas / artistas</span>
+          </div>
+        </div>
+
+        {/* Total Collection Market Value Badge */}
+        <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-2xs">
+            <Coins className="w-4 h-4 text-emerald-600" />
+            <span className="text-[11px] text-emerald-800 font-medium">
+              {isFiltered ? 'Valor Filtrado:' : 'Valor Total Coleção:'}
+            </span>
+            <span className="font-mono font-bold text-emerald-950">
+              {formatCurrency(isFiltered ? filteredValue : totalCollectionValue)}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Control Filters Bar */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#E4E4E7] shadow-xs">
@@ -310,17 +356,22 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                     <h4 className="font-extrabold text-sm text-[#09090B] group-hover:text-black truncate">
                       {band.artist}
                     </h4>
-                    <p className="text-xs text-[#71717A] font-medium flex items-center gap-1.5">
-                      <span className="font-bold text-[#18181B]">{band.count} {band.count === 1 ? 'álbum' : 'álbuns'}</span>
-                      {band.minYear && (
-                        <>
-                          <span>•</span>
-                          <span className="font-mono text-[11px]">
-                            {band.minYear === band.maxYear ? band.minYear : `${band.minYear}–${band.maxYear}`}
-                          </span>
-                        </>
-                      )}
-                    </p>
+                    <div className="text-xs text-[#71717A] font-medium flex items-center justify-between gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-[#18181B]">{band.count} {band.count === 1 ? 'álbum' : 'álbuns'}</span>
+                        {band.minYear && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-[11px]">
+                              {band.minYear === band.maxYear ? band.minYear : `${band.minYear}–${band.maxYear}`}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-950 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200" title="Valor total dos discos desta banda">
+                        ~{formatCurrency(band.totalMarketValue)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -395,12 +446,23 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-[#E4E4E7] text-[10px] text-[#71717A] font-mono">
-                  <span className="font-bold">{cd.year || '—'}</span>
-                  {cd.shelfLocation && (
-                    <span className="text-[#18181B] bg-[#F4F4F5] px-1.5 py-0.5 rounded font-sans truncate max-w-[90px] border border-[#E4E4E7]">
-                      {cd.shelfLocation}
+                <div className="mt-2.5 pt-2 border-t border-[#E4E4E7] space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] text-[#71717A] font-mono">
+                    <span className="font-bold text-[#18181B]">{cd.year || '—'}</span>
+                    {/* Etiqueta discreta de valor de mercado */}
+                    <span 
+                      className="text-[10px] font-mono font-semibold text-[#18181B] bg-[#F4F4F5] px-1.5 py-0.5 rounded border border-[#E4E4E7]"
+                      title="Valor estimado de mercado"
+                    >
+                      {getItemMarketPrice(cd)}
                     </span>
+                  </div>
+                  {cd.shelfLocation && (
+                    <div className="text-[10px] text-[#71717A] truncate">
+                      <span className="text-[#18181B] bg-[#F4F4F5] px-1.5 py-0.5 rounded font-sans truncate block border border-[#E4E4E7]">
+                        {cd.shelfLocation}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -425,7 +487,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   />
 
                   <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-bold text-sm text-[#18181B] truncate">
                         {cd.title}
                       </h4>
@@ -437,7 +499,14 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs font-mono text-[#71717A] shrink-0">
+                <div className="flex items-center gap-2.5 text-xs font-mono text-[#71717A] shrink-0">
+                  {/* Etiqueta discreta de valor de mercado */}
+                  <span 
+                    className="text-xs font-mono font-semibold text-[#18181B] bg-[#F4F4F5] px-2 py-0.5 rounded border border-[#E4E4E7]"
+                    title="Valor estimado de mercado"
+                  >
+                    {getItemMarketPrice(cd)}
+                  </span>
                   {cd.year > 0 && <span className="font-bold text-[#18181B]">{cd.year}</span>}
                   {cd.shelfLocation && (
                     <span className="hidden md:inline bg-[#F4F4F5] px-2 py-0.5 rounded text-[#18181B] font-sans border border-[#E4E4E7]">

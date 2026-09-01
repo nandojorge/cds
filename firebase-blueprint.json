@@ -23,8 +23,13 @@
         },
         "status": {
           "type": "string",
-          "enum": ["collection", "wishlist"]
+          "enum": ["collection", "wishlist", "loaned"]
         },
+        "mediaFormat": {
+          "type": "string",
+          "enum": ["CD", "Vinyl"]
+        },
+        "marketPrice": { "type": "string" },
         "desiredPrice": { "type": "string" },
         "purchaseNotes": { "type": "string" },
         "priority": { "type": "string" },

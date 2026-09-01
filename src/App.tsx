@@ -23,6 +23,7 @@ import {
   deleteCDFromFirestore, 
   initializeAndSeedFirestore 
 } from './services/firebase';
+import { calculateTotalMarketValue } from './services/musicBrainz';
 import { Header } from './components/Header';
 import { WishlistView } from './components/WishlistView';
 import { CollectionView } from './components/CollectionView';
@@ -170,6 +171,11 @@ export default function App() {
       if (cd.artist) set.add(cd.artist.trim().toLowerCase());
     }
     return set.size;
+  }, [collection]);
+
+  // Calculate total market estimated value across collection
+  const totalCollectionMarketValue = useMemo(() => {
+    return calculateTotalMarketValue(collection);
   }, [collection]);
 
   // Handle Google Login
@@ -352,6 +358,7 @@ export default function App() {
         collectionCount={collection.length}
         uniqueArtistsCount={uniqueArtistsCount}
         wishlistCount={wishlist.length}
+        totalMarketValue={totalCollectionMarketValue}
         onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         user={currentUser}

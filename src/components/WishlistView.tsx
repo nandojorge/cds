@@ -10,10 +10,12 @@ import {
   ChevronRight, 
   ChevronDown, 
   Trash2,
-  Radio
+  Radio,
+  Coins
 } from 'lucide-react';
 import { CDItem, WishlistSortOption, WishlistViewMode, DisplayLayout, MediaFormat } from '../types';
 import { CDCover } from './CDCover';
+import { getItemMarketPrice, calculateTotalMarketValue, formatCurrency } from '../services/musicBrainz';
 
 interface WishlistViewProps {
   wishlist: CDItem[];
@@ -107,6 +109,9 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
     return entries.sort((a, b) => b.count - a.count || a.artist.localeCompare(b.artist));
   }, [filteredWishlist, sortBy]);
 
+  // Calculate total estimated wishlist market value
+  const totalWishlistMarketValue = useMemo(() => calculateTotalMarketValue(wishlist), [wishlist]);
+
   return (
     <div className="space-y-6">
       {/* Top Banner / Title */}
@@ -128,6 +133,15 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Total Wishlist Estimated Market Value */}
+        <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-2xs self-start md:self-auto">
+          <Coins className="w-4 h-4 text-emerald-600" />
+          <span className="text-[11px] text-emerald-800 font-medium">Valor Est. Total:</span>
+          <span className="font-mono font-bold text-emerald-950 text-xs">
+            {formatCurrency(totalWishlistMarketValue)}
+          </span>
         </div>
       </div>
 
@@ -419,6 +433,12 @@ const WishlistCard: React.FC<WishlistCardProps> = ({
                 {cd.year}
               </span>
             )}
+            <span 
+              className="font-mono font-semibold text-[#18181B] bg-[#F4F4F5] px-1.5 py-0.5 rounded border border-[#E4E4E7]"
+              title="Preço de referência no mercado"
+            >
+              {getItemMarketPrice(cd)}
+            </span>
           </div>
 
           {/* Purchase notes snippet */}
@@ -506,9 +526,17 @@ const WishlistRow: React.FC<WishlistCardProps> = ({
       </div>
 
       <div className="flex items-center gap-2.5 justify-end shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E4E4E7]">
+        {/* Discreet reference market price */}
+        <span 
+          className="text-xs font-mono font-semibold text-[#18181B] bg-[#F4F4F5] px-2 py-1 rounded-md border border-[#E4E4E7]"
+          title="Preço de referência no mercado"
+        >
+          {getItemMarketPrice(cd)}
+        </span>
+
         {cd.desiredPrice && (
-          <span className="text-xs font-mono font-bold text-[#059669] bg-[#ECFDF5] px-2 py-1 rounded-md border border-[#A7F3D0]">
-            {cd.desiredPrice}
+          <span className="text-xs font-mono font-bold text-[#059669] bg-[#ECFDF5] px-2 py-1 rounded-md border border-[#A7F3D0]" title="Preço desejado">
+            Alvo: {cd.desiredPrice}
           </span>
         )}
 

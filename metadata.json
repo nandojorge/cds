@@ -1,0 +1,8 @@
+{
+  "name": "Coleção de CDs & Lista de Desejos",
+  "description": "Gestão de coleção de CDs e Lista de Desejos com pesquisa MusicBrainz, transição Já Comprei e estatísticas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

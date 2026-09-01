@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "cd": {
+      "title": "CD Item",
+      "description": "Álbum de música na coleção ou lista de desejos do utilizador",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "year": { "type": "number" },
+        "genre": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "mbid": { "type": "string" },
+        "barcode": { "type": "string" },
+        "label": { "type": "string" },
+        "country": { "type": "string" },
+        "trackCount": { "type": "number" },
+        "tracks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["collection", "wishlist"]
+        },
+        "desiredPrice": { "type": "string" },
+        "purchaseNotes": { "type": "string" },
+        "priority": { "type": "string" },
+        "addedAt": { "type": "string" },
+        "addedToCollectionDate": { "type": "string" },
+        "condition": { "type": "string" },
+        "shelfLocation": { "type": "string" },
+        "actualPrice": { "type": "string" },
+        "rating": { "type": "number" }
+      },
+      "required": ["userId", "title", "artist", "status", "addedAt"]
+    }
+  },
+  "firestore": {
+    "/cds/{cdId}": {
+      "schema": "#/entities/cd",
+      "description": "Coleção de CDs e itens da Lista de Desejos"
+    }
+  }
+}
